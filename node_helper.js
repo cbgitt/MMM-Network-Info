@@ -11,118 +11,124 @@ module.exports = NodeHelper.create({
     },
 
     socketNotificationReceived: function(notification, payload) {
-        // The payload is now the module's config object
         if (notification === "GET_NETWORK_INFO") {
             this.getNetworkInfo(payload);
         }
     },
 
-    getNetworkInfo: function(config) {
+    // Helper function to execute shell commands with a timeout
+    executeCommand: function(command, key) {
+        return new Promise((resolve) => {
+            exec(command, { timeout: 5000 }, (error, stdout, stderr) => { // 5-second timeout
+                if (error) {
+                    // This will catch timeouts and other execution errors.
+                    console.error(`MMM-Network-Info: Error executing command for '${key}': ${error.message}`);
+                    resolve({ key: key, value: "Not available" });
+                    return;
+                }
+                if (stderr) {
+                    // stderr is not always a true error, so we log it for debugging purposes.
+                    console.log(`MMM-Network-Info: Stderr for '${key}': ${stderr.trim()}`);
+                }
+                resolve({ key: key, value: stdout.trim() });
+            });
+        });
+    },
+
+    getNetworkInfo: async function(config) {
         var self = this;
-        var commands = {};
         const show = config.show;
+        console.log("MMM-Network-Info: Received request to get network info.");
+
+        var promises = [];
+        var commands = {};
 
         // Conditionally build the commands object based on the config
         if (show.hostname) commands.hostname = "hostname";
         if (show.internalIp) commands.internalIp = "hostname -I | awk '{print $1}'";
-        // We need the public IP if we want to show it OR if we want to show geolocation
         if (show.publicIp || show.geolocation) commands.publicIp = "dig +short myip.opendns.com @resolver1.opendns.com";
         if (show.tailscaleIp) commands.tailscaleIp = "tailscale ip -4";
         if (show.networkDeviceCount) commands.networkDeviceCount = "arp -a | wc -l";
-        if (show.moduleCount) commands.moduleCount = `ls -d ${path.resolve(global.root_path, "modules")}/*/ | wc -l`;
+        
+        console.log("MMM-Network-Info: Will execute the following commands:", Object.keys(commands));
 
-        // If nothing is enabled, send an empty result
-        if (Object.keys(commands).length === 0) {
+        // Create promises for all shell commands
+        for (const [key, command] of Object.entries(commands)) {
+            promises.push(this.executeCommand(command, key));
+        }
+
+        // Handle module count with Node's fs module for better reliability
+        if (show.moduleCount) {
+            const modulePath = path.resolve(global.root_path, "modules");
+            const modulePromise = new Promise((resolve) => {
+                fs.readdir(modulePath, { withFileTypes: true }, (err, files) => {
+                    if (err) {
+                        console.error("MMM-Network-Info: Could not read modules directory:", err);
+                        resolve({ key: 'moduleCount', value: 'N/A' });
+                    } else {
+                        const directoryCount = files.filter(dirent => dirent.isDirectory()).length;
+                        resolve({ key: 'moduleCount', value: directoryCount.toString() });
+                    }
+                });
+            });
+            promises.push(modulePromise);
+            console.log("MMM-Network-Info: Will count modules in directory.");
+        }
+
+        if (promises.length === 0) {
+            console.log("MMM-Network-Info: No items enabled in config. Sending empty result.");
             self.sendSocketNotification("NETWORK_INFO_RESULT", {});
             return;
         }
 
-        var promises = Object.keys(commands).map(key => {
-            return new Promise((resolve) => {
-                exec(commands[key], (error, stdout, stderr) => {
-                    if (error) {
-                        console.error(`MMM-Network-Info: Error executing command for '${key}': ${error.message}`);
-                        resolve({ key: key, value: "Not available" });
-                        return;
-                    }
-                    if (stderr) {
-                        // Stderr is not always an error, so we log it for debugging.
-                        console.log(`MMM-Network-Info: Stderr for '${key}': ${stderr}`);
-                    }
-                    resolve({ key: key, value: stdout.trim() });
-                });
-            });
-        });
-
-        Promise.all(promises).then(results => {
-            var networkInfo = {};
-            results.forEach(result => {
-                if (result.value) {
-                    networkInfo[result.key] = result.value;
-                }
-            });
-
-            // Handle geolocation separately
-            if (show.geolocation && networkInfo.publicIp && networkInfo.publicIp !== "Not available") {
-                this.getGeolocation(networkInfo.publicIp, (geolocation) => {
-                    networkInfo.geolocation = geolocation;
-                    // If public IP was only fetched for geolocation, remove it from the final payload
-                    if (!show.publicIp) {
-                        delete networkInfo.publicIp;
-                    }
-                    self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
-                });
-            } else {
-                // If public IP was only fetched for geolocation, remove it from the final payload
-                if (!show.publicIp && networkInfo.hasOwnProperty('publicIp')) {
-                    delete networkInfo.publicIp;
-                }
-                self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
+        const results = await Promise.all(promises);
+        
+        var networkInfo = {};
+        results.forEach(result => {
+            if (result.value) {
+                networkInfo[result.key] = result.value;
             }
         });
+        console.log("MMM-Network-Info: All commands finished. Results:", networkInfo);
+
+        // Handle geolocation separately after getting the public IP
+        if (show.geolocation && networkInfo.publicIp && networkInfo.publicIp !== "Not available") {
+            console.log("MMM-Network-Info: Fetching geolocation for IP:", networkInfo.publicIp);
+            this.getGeolocation(networkInfo.publicIp, (geolocation) => {
+                networkInfo.geolocation = geolocation;
+                if (!show.publicIp) {
+                    delete networkInfo.publicIp;
+                }
+                console.log("MMM-Network-Info: Sending final data with geolocation.");
+                self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
+            });
+        } else {
+            if (!show.publicIp && networkInfo.hasOwnProperty('publicIp')) {
+                delete networkInfo.publicIp;
+            }
+            console.log("MMM-Network-Info: Sending final data without geolocation.");
+            self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
+        }
     },
 
     getGeolocation: function(ip, callback) {
-        exec(`curl -s http://ip-api.com/json/${ip}`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Geolocation error: ${error.message}`);
+        this.executeCommand(`curl -s http://ip-api.com/json/${ip}`, 'geolocation').then(result => {
+            if (result.value === "Not available") {
                 callback("N/A");
                 return;
             }
             try {
-                const geoData = JSON.parse(stdout);
+                const geoData = JSON.parse(result.value);
                 if (geoData.status === "success") {
                     callback(`${geoData.city}, ${geoData.regionName}, ${geoData.country}`);
                 } else {
+                    console.error("MMM-Network-Info: Geolocation API returned status:", geoData.status);
                     callback("N/A");
                 }
             } catch (e) {
-                console.error("Error parsing geolocation data:", e);
+                console.error("MMM-Network-Info: Error parsing geolocation JSON:", e);
                 callback("N/A");
             }
         });
     }
 });
-```
-I've updated the code as you requested. Now, in your `config.js` file, you can specify exactly which items you want to see. For example, to only show the hostname, public IP, and module count, your config would look like this:
-
-```javascript
-{
-    module: "MMM-Network-Info",
-    position: "top_left",
-    config: {
-        title: "My Custom Network Info",
-        show: {
-            hostname: true,
-            internalIp: false, // This will be hidden
-            publicIp: true,
-            tailscaleIp: false, // This will be hidden
-            geolocation: false, // This will be hidden
-            networkDeviceCount: false, // This will be hidden
-            moduleCount: true
-        }
-    }
-},
-```
-
-Let me know if you'd like any more adjustmen

@@ -10,9 +10,9 @@
 Module.register("MMM-Network-Info", {
     // Default module config.
     defaults: {
-        updateInterval: 10 * 60 * 1000, // every 10 minutes
-        animationSpeed: 1000,
-        initialLoadDelay: 2500,
+        updateInterval: 10 * 60, // in seconds, default 10 minutes
+        animationSpeed: 1,       // in seconds
+        initialLoadDelay: 2.5,   // in seconds
         title: "Network & System Info",
         show: {
             hostname: true,
@@ -21,7 +21,8 @@ Module.register("MMM-Network-Info", {
             tailscaleIp: true,
             geolocation: true,
             networkDeviceCount: true,
-            moduleCount: true
+            moduleCount: true,
+            listDevices: false // Set to true to show the device list
         }
     },
 
@@ -45,13 +46,17 @@ Module.register("MMM-Network-Info", {
             return wrapper;
         }
 
-        var table = document.createElement("table");
-        table.className = "small";
+        // Main container for tables
+        var tablesContainer = document.createElement("div");
+        tablesContainer.className = "MMM-Network-Info-wrapper";
+
+        // --- Info Table (First Table) ---
+        var infoTable = document.createElement("table");
+        infoTable.className = "small info-table";
 
         var info = this.networkInfo;
         var config = this.config;
 
-        // Build rows based on config and available data
         var rows = [
             { label: "Hostname", value: info.hostname, show: config.show.hostname },
             { label: "Internal", value: info.internalIp, show: config.show.internalIp },
@@ -63,10 +68,9 @@ Module.register("MMM-Network-Info", {
         ];
 
         rows.forEach(function(row) {
-            // Only create the table row if the 'show' flag is true and a value exists
             if (row.show && row.value) {
                 var tr = document.createElement("tr");
-                table.appendChild(tr);
+                infoTable.appendChild(tr);
 
                 var tdLabel = document.createElement("td");
                 tdLabel.className = "label";
@@ -79,9 +83,41 @@ Module.register("MMM-Network-Info", {
                 tr.appendChild(tdValue);
             }
         });
+        tablesContainer.appendChild(infoTable);
 
-        wrapper.appendChild(table);
-        return wrapper;
+
+        // --- Device List Table (Second Table) ---
+        if (config.show.listDevices && info.deviceList && info.deviceList.length > 0) {
+            var deviceTable = document.createElement("table");
+            deviceTable.className = "small device-table";
+
+            // Table Header
+            var a_tr = document.createElement("tr");
+            var th_ip = document.createElement("th");
+            th_ip.className = "label";
+            th_ip.innerHTML = "Device IP";
+            var th_mac = document.createElement("th");
+            th_mac.className = "value";
+            th_mac.innerHTML = "MAC Address";
+            a_tr.appendChild(th_ip);
+            a_tr.appendChild(th_mac);
+            deviceTable.appendChild(a_tr);
+
+            // Table Body
+            info.deviceList.forEach(function(device) {
+                var tr = document.createElement("tr");
+                var ipCell = document.createElement("td");
+                ipCell.innerHTML = device.ip;
+                var macCell = document.createElement("td");
+                macCell.innerHTML = device.mac;
+                tr.appendChild(ipCell);
+                tr.appendChild(macCell);
+                deviceTable.appendChild(tr);
+            });
+            tablesContainer.appendChild(deviceTable);
+        }
+
+        return tablesContainer;
     },
 
     // Override notification handler.
@@ -89,7 +125,8 @@ Module.register("MMM-Network-Info", {
         if (notification === "NETWORK_INFO_RESULT") {
             this.networkInfo = payload;
             this.loaded = true;
-            this.updateDom(this.config.animationSpeed);
+            // Convert animationSpeed from seconds to milliseconds for the updateDom function
+            this.updateDom(this.config.animationSpeed * 1000);
         }
     },
 
@@ -102,14 +139,14 @@ Module.register("MMM-Network-Info", {
 
         var self = this;
         clearTimeout(this.updateTimer);
+        // Convert nextLoad from seconds to milliseconds for setTimeout
         this.updateTimer = setTimeout(function() {
             self.getNetworkInfo();
-        }, nextLoad);
+        }, nextLoad * 1000);
     },
 
     // Request network info from node_helper.
     getNetworkInfo: function() {
-        // Pass the entire config to the node_helper
         this.sendSocketNotification("GET_NETWORK_INFO", this.config);
     },
 

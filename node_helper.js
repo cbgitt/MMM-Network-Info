@@ -16,18 +16,15 @@ module.exports = NodeHelper.create({
         }
     },
 
-    // Helper function to execute shell commands with a timeout
     executeCommand: function(command, key) {
         return new Promise((resolve) => {
-            exec(command, { timeout: 5000 }, (error, stdout, stderr) => { // 5-second timeout
+            exec(command, { timeout: 5000 }, (error, stdout, stderr) => {
                 if (error) {
-                    // This will catch timeouts and other execution errors.
                     console.error(`MMM-Network-Info: Error executing command for '${key}': ${error.message}`);
                     resolve({ key: key, value: "Not available" });
                     return;
                 }
                 if (stderr) {
-                    // stderr is not always a true error, so we log it for debugging purposes.
                     console.log(`MMM-Network-Info: Stderr for '${key}': ${stderr.trim()}`);
                 }
                 resolve({ key: key, value: stdout.trim() });
@@ -43,21 +40,24 @@ module.exports = NodeHelper.create({
         var promises = [];
         var commands = {};
 
-        // Conditionally build the commands object based on the config
         if (show.hostname) commands.hostname = "hostname";
         if (show.internalIp) commands.internalIp = "hostname -I | awk '{print $1}'";
         if (show.publicIp || show.geolocation) commands.publicIp = "dig +short myip.opendns.com @resolver1.opendns.com";
         if (show.tailscaleIp) commands.tailscaleIp = "tailscale ip -4";
-        if (show.networkDeviceCount) commands.networkDeviceCount = "arp -a | wc -l";
+
+        // If listDevices is true, we get the full list. Otherwise, we just get the count if enabled.
+        if (show.listDevices) {
+            commands.deviceList = "arp -a";
+        } else if (show.networkDeviceCount) {
+            commands.networkDeviceCount = "arp -a | wc -l";
+        }
         
         console.log("MMM-Network-Info: Will execute the following commands:", Object.keys(commands));
 
-        // Create promises for all shell commands
         for (const [key, command] of Object.entries(commands)) {
             promises.push(this.executeCommand(command, key));
         }
 
-        // Handle module count with Node's fs module for better reliability
         if (show.moduleCount) {
             const modulePath = path.resolve(global.root_path, "modules");
             const modulePromise = new Promise((resolve) => {
@@ -72,11 +72,9 @@ module.exports = NodeHelper.create({
                 });
             });
             promises.push(modulePromise);
-            console.log("MMM-Network-Info: Will count modules in directory.");
         }
 
         if (promises.length === 0) {
-            console.log("MMM-Network-Info: No items enabled in config. Sending empty result.");
             self.sendSocketNotification("NETWORK_INFO_RESULT", {});
             return;
         }
@@ -89,24 +87,36 @@ module.exports = NodeHelper.create({
                 networkInfo[result.key] = result.value;
             }
         });
-        console.log("MMM-Network-Info: All commands finished. Results:", networkInfo);
 
-        // Handle geolocation separately after getting the public IP
+        // Parse the device list if it exists
+        if (networkInfo.deviceList) {
+            const lines = networkInfo.deviceList.split('\n');
+            const devices = [];
+            const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
+
+            lines.forEach(line => {
+                const macMatch = line.match(macRegex);
+                if (macMatch) {
+                    const parts = line.split(' ');
+                    const ip = parts[1].replace(/[()]/g, ''); // Extract IP and remove parentheses
+                    devices.push({ ip: ip, mac: macMatch[0] });
+                }
+            });
+            networkInfo.deviceList = devices;
+            // If we need the count, we derive it from the list we just made.
+            if (show.networkDeviceCount) {
+                networkInfo.networkDeviceCount = devices.length.toString();
+            }
+        }
+
         if (show.geolocation && networkInfo.publicIp && networkInfo.publicIp !== "Not available") {
-            console.log("MMM-Network-Info: Fetching geolocation for IP:", networkInfo.publicIp);
             this.getGeolocation(networkInfo.publicIp, (geolocation) => {
                 networkInfo.geolocation = geolocation;
-                if (!show.publicIp) {
-                    delete networkInfo.publicIp;
-                }
-                console.log("MMM-Network-Info: Sending final data with geolocation.");
+                if (!show.publicIp) delete networkInfo.publicIp;
                 self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
             });
         } else {
-            if (!show.publicIp && networkInfo.hasOwnProperty('publicIp')) {
-                delete networkInfo.publicIp;
-            }
-            console.log("MMM-Network-Info: Sending final data without geolocation.");
+            if (!show.publicIp && networkInfo.hasOwnProperty('publicIp')) delete networkInfo.publicIp;
             self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
         }
     },
@@ -122,11 +132,9 @@ module.exports = NodeHelper.create({
                 if (geoData.status === "success") {
                     callback(`${geoData.city}, ${geoData.regionName}, ${geoData.country}`);
                 } else {
-                    console.error("MMM-Network-Info: Geolocation API returned status:", geoData.status);
                     callback("N/A");
                 }
             } catch (e) {
-                console.error("MMM-Network-Info: Error parsing geolocation JSON:", e);
                 callback("N/A");
             }
         });

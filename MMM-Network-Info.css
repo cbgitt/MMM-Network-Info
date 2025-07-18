@@ -1,5 +1,11 @@
 /* MMM-Network-Info.css */
 
+/* This new wrapper uses flexbox to place tables side-by-side */
+.MMM-Network-Info-wrapper {
+  display: flex;
+  gap: 30px; /* Adjust the space between the two tables */
+}
+
 .MMM-Network-Info .label {
   padding-right: 15px;
   font-weight: bold;
@@ -13,4 +19,14 @@
 .MMM-Network-Info table {
   width: 100%;
   border-collapse: collapse;
+}
+
+/* Specific styling for the new device table */
+.MMM-Network-Info .device-table th {
+  padding-bottom: 5px;
+  border-bottom: 1px solid #666; /* A line to separate header from content */
+}
+
+.MMM-Network-Info .device-table td {
+  padding-top: 2px;
 }

@@ -45,15 +45,12 @@ module.exports = NodeHelper.create({
         if (show.publicIp || show.geolocation) commands.publicIp = "dig +short myip.opendns.com @resolver1.opendns.com";
         if (show.tailscaleIp) commands.tailscaleIp = "tailscale ip -4";
 
-        // If listDevices is true, we get the full list. Otherwise, we just get the count if enabled.
         if (show.listDevices) {
             commands.deviceList = "arp -a";
         } else if (show.networkDeviceCount) {
             commands.networkDeviceCount = "arp -a | wc -l";
         }
         
-        console.log("MMM-Network-Info: Will execute the following commands:", Object.keys(commands));
-
         for (const [key, command] of Object.entries(commands)) {
             promises.push(this.executeCommand(command, key));
         }
@@ -88,24 +85,38 @@ module.exports = NodeHelper.create({
             }
         });
 
-        // Parse the device list if it exists
         if (networkInfo.deviceList) {
             const lines = networkInfo.deviceList.split('\n');
-            const devices = [];
+            const initialDevices = [];
             const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
 
             lines.forEach(line => {
                 const macMatch = line.match(macRegex);
                 if (macMatch) {
                     const parts = line.split(' ');
-                    const ip = parts[1].replace(/[()]/g, ''); // Extract IP and remove parentheses
-                    devices.push({ ip: ip, mac: macMatch[0] });
+                    const ip = parts[1].replace(/[()]/g, '');
+                    initialDevices.push({ ip: ip, mac: macMatch[0] });
                 }
             });
-            networkInfo.deviceList = devices;
-            // If we need the count, we derive it from the list we just made.
+            
+            const devicePromises = initialDevices.map(device => 
+                this.executeCommand(`nslookup ${device.ip}`, 'nslookup').then(result => {
+                    let hostname = 'N/A';
+                    if (result.value !== 'Not available' && result.value.includes('name =')) {
+                        const nameMatch = result.value.match(/name = (.*?)\.?\n/);
+                        if (nameMatch && nameMatch[1]) {
+                            hostname = nameMatch[1];
+                        }
+                    }
+                    return { ...device, hostname: hostname };
+                })
+            );
+
+            const devicesWithHostnames = await Promise.all(devicePromises);
+            networkInfo.deviceList = devicesWithHostnames;
+
             if (show.networkDeviceCount) {
-                networkInfo.networkDeviceCount = devices.length.toString();
+                networkInfo.networkDeviceCount = devicesWithHostnames.length.toString();
             }
         }
 
@@ -124,8 +135,7 @@ module.exports = NodeHelper.create({
     getGeolocation: function(ip, callback) {
         this.executeCommand(`curl -s http://ip-api.com/json/${ip}`, 'geolocation').then(result => {
             if (result.value === "Not available") {
-                callback("N/A");
-                return;
+                callback("N/A"); return;
             }
             try {
                 const geoData = JSON.parse(result.value);

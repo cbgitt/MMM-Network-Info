@@ -13,7 +13,16 @@ Module.register("MMM-Network-Info", {
         updateInterval: 10 * 60 * 1000, // every 10 minutes
         animationSpeed: 1000,
         initialLoadDelay: 2500,
-        title: "Network & System Info"
+        title: "Network & System Info",
+        show: {
+            hostname: true,
+            internalIp: true,
+            publicIp: true,
+            tailscaleIp: true,
+            geolocation: true,
+            networkDeviceCount: true,
+            moduleCount: true
+        }
     },
 
     // Define start sequence.
@@ -40,19 +49,22 @@ Module.register("MMM-Network-Info", {
         table.className = "small";
 
         var info = this.networkInfo;
+        var config = this.config;
 
+        // Build rows based on config and available data
         var rows = [
-            { label: "Hostname", value: info.hostname },
-            { label: "Internal IP", value: info.internalIp },
-            { label: "Public IP", value: info.publicIp },
-            { label: "Tailscale IP", value: info.tailscaleIp },
-            { label: "IP Geolocation", value: info.geolocation },
-            { label: "Devices on Network", value: info.networkDeviceCount },
-            { label: "Installed Modules", value: info.moduleCount }
+            { label: "Hostname", value: info.hostname, show: config.show.hostname },
+            { label: "Internal IP", value: info.internalIp, show: config.show.internalIp },
+            { label: "Public IP", value: info.publicIp, show: config.show.publicIp },
+            { label: "Tailscale IP", value: info.tailscaleIp, show: config.show.tailscaleIp },
+            { label: "IP Geolocation", value: info.geolocation, show: config.show.geolocation },
+            { label: "Devices on Network", value: info.networkDeviceCount, show: config.show.networkDeviceCount },
+            { label: "Installed Modules", value: info.moduleCount, show: config.show.moduleCount }
         ];
 
         rows.forEach(function(row) {
-            if (row.value) {
+            // Only create the table row if the 'show' flag is true and a value exists
+            if (row.show && row.value) {
                 var tr = document.createElement("tr");
                 table.appendChild(tr);
 
@@ -97,7 +109,8 @@ Module.register("MMM-Network-Info", {
 
     // Request network info from node_helper.
     getNetworkInfo: function() {
-        this.sendSocketNotification("GET_NETWORK_INFO");
+        // Pass the entire config to the node_helper
+        this.sendSocketNotification("GET_NETWORK_INFO", this.config);
     },
 
     // Add a custom CSS file.

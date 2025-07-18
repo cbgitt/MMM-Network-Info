@@ -41,7 +41,7 @@
   padding-top: 2px;
 }
 
-/* Align the last column (MAC Address) to the right */
+/* Align the last column (now Hostname) to the right */
 .MMM-Network-Info .device-table th:last-child,
 .MMM-Network-Info .device-table td:last-child {
   text-align: right;

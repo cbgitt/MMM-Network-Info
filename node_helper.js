@@ -89,18 +89,18 @@ module.exports = NodeHelper.create({
             const lines = networkInfo.deviceList.split('\n');
             const devices = [];
             const ipRegex = /\(([^)]+)\)/; // Extracts content from parentheses
-            const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
+            const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/; // Used for line validation
 
             lines.forEach(line => {
                 const ipMatch = line.match(ipRegex);
-                const macMatch = line.match(macRegex);
+                const macMatch = line.match(macRegex); // Ensures it's a valid device line
 
                 if (ipMatch && macMatch) {
                     const hostname = line.split(' ')[0];
                     devices.push({
                         ip: ipMatch[1],
-                        hostname: (hostname !== '?') ? hostname : 'N/A',
-                        mac: macMatch[0]
+                        hostname: (hostname !== '?') ? hostname : 'N/A'
+                        // MAC address is no longer added
                     });
                 }
             });
@@ -132,7 +132,6 @@ module.exports = NodeHelper.create({
             try {
                 const geoData = JSON.parse(result.value);
                 if (geoData.status === "success") {
-                    // Corrected typo here from geo_data to geoData
                     callback(`${geoData.city}, ${geoData.regionName}, ${geoData.country}`);
                 } else {
                     callback("N/A");

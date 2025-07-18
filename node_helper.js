@@ -24,7 +24,7 @@ module.exports = NodeHelper.create({
                     resolve({ key: key, value: "Not available" });
                     return;
                 }
-                if (stderr) {
+                if (stderr && key !== 'arp') { // arp command often outputs to stderr on some systems
                     console.log(`MMM-Network-Info: Stderr for '${key}': ${stderr.trim()}`);
                 }
                 resolve({ key: key, value: stdout.trim() });
@@ -45,10 +45,9 @@ module.exports = NodeHelper.create({
         if (show.publicIp || show.geolocation) commands.publicIp = "dig +short myip.opendns.com @resolver1.opendns.com";
         if (show.tailscaleIp) commands.tailscaleIp = "tailscale ip -4";
 
-        if (show.listDevices) {
+        // We always use 'arp -a' for the device list now, which is more robust.
+        if (show.listDevices || show.networkDeviceCount) {
             commands.deviceList = "arp -a";
-        } else if (show.networkDeviceCount) {
-            commands.networkDeviceCount = "arp -a | wc -l";
         }
         
         for (const [key, command] of Object.entries(commands)) {
@@ -85,38 +84,31 @@ module.exports = NodeHelper.create({
             }
         });
 
+        // If deviceList was fetched, parse it for all device info.
         if (networkInfo.deviceList) {
             const lines = networkInfo.deviceList.split('\n');
-            const initialDevices = [];
+            const devices = [];
+            const ipRegex = /\(([^)]+)\)/; // Extracts content from parentheses
             const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
 
             lines.forEach(line => {
+                const ipMatch = line.match(ipRegex);
                 const macMatch = line.match(macRegex);
-                if (macMatch) {
-                    const parts = line.split(' ');
-                    const ip = parts[1].replace(/[()]/g, '');
-                    initialDevices.push({ ip: ip, mac: macMatch[0] });
+
+                if (ipMatch && macMatch) {
+                    const hostname = line.split(' ')[0];
+                    devices.push({
+                        ip: ipMatch[1],
+                        hostname: (hostname !== '?') ? hostname : 'N/A',
+                        mac: macMatch[0]
+                    });
                 }
             });
             
-            const devicePromises = initialDevices.map(device => 
-                this.executeCommand(`nslookup ${device.ip}`, 'nslookup').then(result => {
-                    let hostname = 'N/A';
-                    if (result.value !== 'Not available' && result.value.includes('name =')) {
-                        const nameMatch = result.value.match(/name = (.*?)\.?\n/);
-                        if (nameMatch && nameMatch[1]) {
-                            hostname = nameMatch[1];
-                        }
-                    }
-                    return { ...device, hostname: hostname };
-                })
-            );
-
-            const devicesWithHostnames = await Promise.all(devicePromises);
-            networkInfo.deviceList = devicesWithHostnames;
+            networkInfo.deviceList = devices;
 
             if (show.networkDeviceCount) {
-                networkInfo.networkDeviceCount = devicesWithHostnames.length.toString();
+                networkInfo.networkDeviceCount = devices.length.toString();
             }
         }
 
@@ -140,6 +132,7 @@ module.exports = NodeHelper.create({
             try {
                 const geoData = JSON.parse(result.value);
                 if (geoData.status === "success") {
+                    // Corrected typo here from geo_data to geoData
                     callback(`${geoData.city}, ${geoData.regionName}, ${geoData.country}`);
                 } else {
                     callback("N/A");

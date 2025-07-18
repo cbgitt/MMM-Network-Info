@@ -1,6 +1,5 @@
 /* MMM-Network-Info.css */
 
-/* This new wrapper uses flexbox to place tables side-by-side */
 .MMM-Network-Info-wrapper {
   display: flex;
   gap: 30px; /* Adjust the space between the two tables */
@@ -9,7 +8,7 @@
 .MMM-Network-Info .label {
   padding-right: 15px;
   font-weight: bold;
-  text-align: left; /* This ensures the labels are left-aligned */
+  text-align: left;
 }
 
 .MMM-Network-Info .value {
@@ -21,12 +20,30 @@
   border-collapse: collapse;
 }
 
-/* Specific styling for the new device table */
-.MMM-Network-Info .device-table th {
-  padding-bottom: 5px;
-  border-bottom: 1px solid #666; /* A line to separate header from content */
+/* --- Device Table Specific Styling --- */
+
+/* Style all cells in the device table */
+.MMM-Network-Info .device-table th, 
+.MMM-Network-Info .device-table td {
+  text-align: left;
+  padding-right: 15px; /* Add space between columns */
 }
 
+/* Style the header row */
+.MMM-Network-Info .device-table th {
+  padding-bottom: 5px;
+  border-bottom: 1px solid #666;
+  font-weight: bold;
+}
+
+/* Style the data rows */
 .MMM-Network-Info .device-table td {
   padding-top: 2px;
+}
+
+/* Align the last column (MAC Address) to the right */
+.MMM-Network-Info .device-table th:last-child,
+.MMM-Network-Info .device-table td:last-child {
+  text-align: right;
+  padding-right: 0;
 }

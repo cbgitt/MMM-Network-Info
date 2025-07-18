@@ -1,157 +1,152 @@
-/*
- * MagicMirror² Module: MMM-Network-Info
- *
- * By [Your Name]
- * MIT Licensed.
- */
+// node_helper.js for MMM-Network-Info
 
-// MMM-Network-Info.js
+const NodeHelper = require("node_helper");
+const { exec } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 
-Module.register("MMM-Network-Info", {
-    // Default module config.
-    defaults: {
-        updateInterval: 10 * 60, // in seconds, default 10 minutes
-        animationSpeed: 1,       // in seconds
-        initialLoadDelay: 2.5,   // in seconds
-        title: "Network & System Info",
-        show: {
-            hostname: true,
-            internalIp: true,
-            publicIp: true,
-            tailscaleIp: true,
-            geolocation: true,
-            networkDeviceCount: true,
-            moduleCount: true,
-            listDevices: false // Set to true to show the device list
-        }
-    },
-
-    // Define start sequence.
+module.exports = NodeHelper.create({
     start: function() {
-        Log.info("Starting module: " + this.name);
-        this.loaded = false;
-        this.data.header = this.config.title;
-        this.networkInfo = {};
-        this.scheduleUpdate(this.config.initialLoadDelay);
-        this.updateTimer = null;
+        console.log("Starting node_helper for: " + this.name);
     },
 
-    // Override dom generator.
-    getDom: function() {
-        var wrapper = document.createElement("div");
+    socketNotificationReceived: function(notification, payload) {
+        if (notification === "GET_NETWORK_INFO") {
+            this.getNetworkInfo(payload);
+        }
+    },
 
-        if (!this.loaded) {
-            wrapper.innerHTML = "Loading network info...";
-            wrapper.className = "dimmed light small";
-            return wrapper;
+    executeCommand: function(command, key) {
+        return new Promise((resolve) => {
+            exec(command, { timeout: 5000 }, (error, stdout, stderr) => {
+                if (error) {
+                    console.error(`MMM-Network-Info: Error executing command for '${key}': ${error.message}`);
+                    resolve({ key: key, value: "Not available" });
+                    return;
+                }
+                if (stderr) {
+                    console.log(`MMM-Network-Info: Stderr for '${key}': ${stderr.trim()}`);
+                }
+                resolve({ key: key, value: stdout.trim() });
+            });
+        });
+    },
+
+    getNetworkInfo: async function(config) {
+        var self = this;
+        const show = config.show;
+        console.log("MMM-Network-Info: Received request to get network info.");
+
+        var promises = [];
+        var commands = {};
+
+        if (show.hostname) commands.hostname = "hostname";
+        if (show.internalIp) commands.internalIp = "hostname -I | awk '{print $1}'";
+        if (show.publicIp || show.geolocation) commands.publicIp = "dig +short myip.opendns.com @resolver1.opendns.com";
+        if (show.tailscaleIp) commands.tailscaleIp = "tailscale ip -4";
+
+        if (show.listDevices) {
+            commands.deviceList = "arp -a";
+        } else if (show.networkDeviceCount) {
+            commands.networkDeviceCount = "arp -a | wc -l";
+        }
+        
+        for (const [key, command] of Object.entries(commands)) {
+            promises.push(this.executeCommand(command, key));
         }
 
-        // Main container for tables
-        var tablesContainer = document.createElement("div");
-        tablesContainer.className = "MMM-Network-Info-wrapper";
+        if (show.moduleCount) {
+            const modulePath = path.resolve(global.root_path, "modules");
+            const modulePromise = new Promise((resolve) => {
+                fs.readdir(modulePath, { withFileTypes: true }, (err, files) => {
+                    if (err) {
+                        console.error("MMM-Network-Info: Could not read modules directory:", err);
+                        resolve({ key: 'moduleCount', value: 'N/A' });
+                    } else {
+                        const directoryCount = files.filter(dirent => dirent.isDirectory()).length;
+                        resolve({ key: 'moduleCount', value: directoryCount.toString() });
+                    }
+                });
+            });
+            promises.push(modulePromise);
+        }
 
-        // --- Info Table (First Table) ---
-        var infoTable = document.createElement("table");
-        infoTable.className = "small info-table";
+        if (promises.length === 0) {
+            self.sendSocketNotification("NETWORK_INFO_RESULT", {});
+            return;
+        }
 
-        var info = this.networkInfo;
-        var config = this.config;
-
-        var rows = [
-            { label: "Hostname", value: info.hostname, show: config.show.hostname },
-            { label: "Internal", value: info.internalIp, show: config.show.internalIp },
-            { label: "Public", value: info.publicIp, show: config.show.publicIp },
-            { label: "Tailscale", value: info.tailscaleIp, show: config.show.tailscaleIp },
-            { label: "Location", value: info.geolocation, show: config.show.geolocation },
-            { label: "Devices", value: info.networkDeviceCount, show: config.show.networkDeviceCount },
-            { label: "Modules", value: info.moduleCount, show: config.show.moduleCount }
-        ];
-
-        rows.forEach(function(row) {
-            if (row.show && row.value) {
-                var tr = document.createElement("tr");
-                infoTable.appendChild(tr);
-
-                var tdLabel = document.createElement("td");
-                tdLabel.className = "label";
-                tdLabel.innerHTML = row.label;
-                tr.appendChild(tdLabel);
-
-                var tdValue = document.createElement("td");
-                tdValue.className = "value";
-                tdValue.innerHTML = row.value;
-                tr.appendChild(tdValue);
+        const results = await Promise.all(promises);
+        
+        var networkInfo = {};
+        results.forEach(result => {
+            if (result.value) {
+                networkInfo[result.key] = result.value;
             }
         });
-        tablesContainer.appendChild(infoTable);
 
+        if (networkInfo.deviceList) {
+            const lines = networkInfo.deviceList.split('\n');
+            const initialDevices = [];
+            const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
 
-        // --- Device List Table (Second Table) ---
-        if (config.show.listDevices && info.deviceList && info.deviceList.length > 0) {
-            var deviceTable = document.createElement("table");
-            deviceTable.className = "small device-table";
-
-            // Table Header
-            var a_tr = document.createElement("tr");
-            var th_ip = document.createElement("th");
-            th_ip.className = "label";
-            th_ip.innerHTML = "Device IP";
-            var th_mac = document.createElement("th");
-            th_mac.className = "value";
-            th_mac.innerHTML = "MAC Address";
-            a_tr.appendChild(th_ip);
-            a_tr.appendChild(th_mac);
-            deviceTable.appendChild(a_tr);
-
-            // Table Body
-            info.deviceList.forEach(function(device) {
-                var tr = document.createElement("tr");
-                var ipCell = document.createElement("td");
-                ipCell.innerHTML = device.ip;
-                var macCell = document.createElement("td");
-                macCell.innerHTML = device.mac;
-                tr.appendChild(ipCell);
-                tr.appendChild(macCell);
-                deviceTable.appendChild(tr);
+            lines.forEach(line => {
+                const macMatch = line.match(macRegex);
+                if (macMatch) {
+                    const parts = line.split(' ');
+                    const ip = parts[1].replace(/[()]/g, '');
+                    initialDevices.push({ ip: ip, mac: macMatch[0] });
+                }
             });
-            tablesContainer.appendChild(deviceTable);
+            
+            const devicePromises = initialDevices.map(device => 
+                this.executeCommand(`nslookup ${device.ip}`, 'nslookup').then(result => {
+                    let hostname = 'N/A';
+                    if (result.value !== 'Not available' && result.value.includes('name =')) {
+                        const nameMatch = result.value.match(/name = (.*?)\.?\n/);
+                        if (nameMatch && nameMatch[1]) {
+                            hostname = nameMatch[1];
+                        }
+                    }
+                    return { ...device, hostname: hostname };
+                })
+            );
+
+            const devicesWithHostnames = await Promise.all(devicePromises);
+            networkInfo.deviceList = devicesWithHostnames;
+
+            if (show.networkDeviceCount) {
+                networkInfo.networkDeviceCount = devicesWithHostnames.length.toString();
+            }
         }
 
-        return tablesContainer;
-    },
-
-    // Override notification handler.
-    socketNotificationReceived: function(notification, payload) {
-        if (notification === "NETWORK_INFO_RESULT") {
-            this.networkInfo = payload;
-            this.loaded = true;
-            // Convert animationSpeed from seconds to milliseconds for the updateDom function
-            this.updateDom(this.config.animationSpeed * 1000);
+        if (show.geolocation && networkInfo.publicIp && networkInfo.publicIp !== "Not available") {
+            this.getGeolocation(networkInfo.publicIp, (geolocation) => {
+                networkInfo.geolocation = geolocation;
+                if (!show.publicIp) delete networkInfo.publicIp;
+                self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
+            });
+        } else {
+            if (!show.publicIp && networkInfo.hasOwnProperty('publicIp')) delete networkInfo.publicIp;
+            self.sendSocketNotification("NETWORK_INFO_RESULT", networkInfo);
         }
     },
 
-    // Schedule the next update.
-    scheduleUpdate: function(delay) {
-        var nextLoad = this.config.updateInterval;
-        if (typeof delay !== "undefined" && delay >= 0) {
-            nextLoad = delay;
-        }
-
-        var self = this;
-        clearTimeout(this.updateTimer);
-        // Convert nextLoad from seconds to milliseconds for setTimeout
-        this.updateTimer = setTimeout(function() {
-            self.getNetworkInfo();
-        }, nextLoad * 1000);
-    },
-
-    // Request network info from node_helper.
-    getNetworkInfo: function() {
-        this.sendSocketNotification("GET_NETWORK_INFO", this.config);
-    },
-
-    // Add a custom CSS file.
-    getStyles: function() {
-        return ["MMM-Network-Info.css"];
+    getGeolocation: function(ip, callback) {
+        this.executeCommand(`curl -s http://ip-api.com/json/${ip}`, 'geolocation').then(result => {
+            if (result.value === "Not available") {
+                callback("N/A"); return;
+            }
+            try {
+                const geoData = JSON.parse(result.value);
+                if (geoData.status === "success") {
+                    callback(`${geoData.city}, ${geoData.regionName}, ${geoData.country}`);
+                } else {
+                    callback("N/A");
+                }
+            } catch (e) {
+                callback("N/A");
+            }
+        });
     }
 });

@@ -1,0 +1,15 @@
+/* MMM-Network-Info.css */
+
+.MMM-Network-Info .label {
+  padding-right: 15px;
+  font-weight: bold;
+}
+
+.MMM-Network-Info .value {
+  text-align: right;
+}
+
+.MMM-Network-Info table {
+  width: 100%;
+  border-collapse: collapse;
+}

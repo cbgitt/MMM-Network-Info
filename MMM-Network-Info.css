@@ -3,6 +3,7 @@
 .MMM-Network-Info .label {
   padding-right: 15px;
   font-weight: bold;
+  text-align: left; /* This ensures the labels are left-aligned */
 }
 
 .MMM-Network-Info .value {

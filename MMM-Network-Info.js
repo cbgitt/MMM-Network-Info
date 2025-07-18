@@ -54,12 +54,12 @@ Module.register("MMM-Network-Info", {
         // Build rows based on config and available data
         var rows = [
             { label: "Hostname", value: info.hostname, show: config.show.hostname },
-            { label: "Internal IP", value: info.internalIp, show: config.show.internalIp },
-            { label: "Public IP", value: info.publicIp, show: config.show.publicIp },
-            { label: "Tailscale IP", value: info.tailscaleIp, show: config.show.tailscaleIp },
-            { label: "IP Geolocation", value: info.geolocation, show: config.show.geolocation },
-            { label: "Devices on Network", value: info.networkDeviceCount, show: config.show.networkDeviceCount },
-            { label: "Installed Modules", value: info.moduleCount, show: config.show.moduleCount }
+            { label: "Internal", value: info.internalIp, show: config.show.internalIp },
+            { label: "Public", value: info.publicIp, show: config.show.publicIp },
+            { label: "Tailscale", value: info.tailscaleIp, show: config.show.tailscaleIp },
+            { label: "Location", value: info.geolocation, show: config.show.geolocation },
+            { label: "Devices", value: info.networkDeviceCount, show: config.show.networkDeviceCount },
+            { label: "Modules", value: info.moduleCount, show: config.show.moduleCount }
         ];
 
         rows.forEach(function(row) {

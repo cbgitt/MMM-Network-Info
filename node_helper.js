@@ -113,6 +113,26 @@ module.exports = NodeHelper.create({
             });
 
             const devicesWithHostnames = await Promise.all(devicePromises);
+            
+            // --- ADDED SORTING LOGIC ---
+            devicesWithHostnames.sort((a, b) => {
+                // Rule 1: Gateway always comes first.
+                if (a.hostname === 'Gateway') return -1;
+                if (b.hostname === 'Gateway') return 1;
+
+                // Rule 2: Sort by IP address numerically.
+                const a_parts = a.ip.split('.').map(Number);
+                const b_parts = b.ip.split('.').map(Number);
+
+                for (let i = 0; i < 4; i++) {
+                    const diff = a_parts[i] - b_parts[i];
+                    if (diff !== 0) {
+                        return diff;
+                    }
+                }
+                return 0; // Should not happen with unique IPs
+            });
+            
             networkInfo.deviceList = devicesWithHostnames;
 
             if (show.networkDeviceCount) {

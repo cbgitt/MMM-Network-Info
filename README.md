@@ -1,13 +1,21 @@
 # Configuration Parameters
 ```
-{
-    module: "MMM-Network-Info",
-    position: "top_left",
-    config: {
-        title: "My Device Vitals", //Default is "Network & System Info"
-        updateInterval: 300000, //(milliseconds - default = 10min
-        animationSpeed: 1000, //default (seconds)
-        initialLoadDelay: 2500, //2.5 seconds default // 0 to load immediately
-    }
-},
+config: {
+        updateInterval: 10 * 60, // in seconds, default 10 minutes
+        animationSpeed: 1,       // in seconds
+        initialLoadDelay: 2.5,   // in seconds
+        title: "Network & System Info",
+        show: {
+            hostname: true,
+            internalIp: true,
+            publicIp: true,
+            tailscaleIp: true,
+            geolocation: true,
+            networkDeviceCount: true,
+            moduleCount: true,
+            listDevices: false // Set to true to show the device list
+             }
+        },
 
+...
+```

@@ -23,6 +23,7 @@
 /* --- Styling for timestamp --- */
 .MMM-Network-Info .last-updated {
     margin-bottom: 10px; /* Space between timestamp and the tables */
+    font-size: 70%;      /* Make text 30% smaller */
 }
 
 /* --- Device Table Specific Styling --- */

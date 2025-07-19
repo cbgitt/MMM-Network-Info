@@ -20,6 +20,11 @@
   border-collapse: collapse;
 }
 
+/* --- Styling for timestamp --- */
+.MMM-Network-Info .last-updated {
+    margin-bottom: 10px; /* Space between timestamp and the tables */
+}
+
 /* --- Device Table Specific Styling --- */
 
 .MMM-Network-Info .device-table th, 

@@ -32,6 +32,7 @@ Module.register("MMM-Network-Info", {
         this.loaded = false;
         this.data.header = this.config.title;
         this.networkInfo = {};
+        this.lastUpdated = null; // Initialize timestamp variable
         this.scheduleUpdate(this.config.initialLoadDelay);
         this.updateTimer = null;
     },
@@ -44,6 +45,15 @@ Module.register("MMM-Network-Info", {
             wrapper.innerHTML = "Loading network info...";
             wrapper.className = "dimmed light small";
             return wrapper;
+        }
+
+        // --- Last Updated Timestamp ---
+        if (this.lastUpdated) {
+            var updatedDiv = document.createElement("div");
+            // Use standard MM classes for styling + a custom one
+            updatedDiv.className = "last-updated dimmed xsmall"; 
+            updatedDiv.innerHTML = "Last updated: " + this.lastUpdated.toLocaleString();
+            wrapper.appendChild(updatedDiv);
         }
 
         // Main container for tables
@@ -71,12 +81,10 @@ Module.register("MMM-Network-Info", {
             if (row.show && row.value) {
                 var tr = document.createElement("tr");
                 infoTable.appendChild(tr);
-
                 var tdLabel = document.createElement("td");
                 tdLabel.className = "label";
                 tdLabel.innerHTML = row.label;
                 tr.appendChild(tdLabel);
-
                 var tdValue = document.createElement("td");
                 tdValue.className = "value";
                 tdValue.innerHTML = row.value;
@@ -85,40 +93,29 @@ Module.register("MMM-Network-Info", {
         });
         tablesContainer.appendChild(infoTable);
 
-
         // --- Device List Table (Second Table) ---
         if (config.show.listDevices && info.deviceList && info.deviceList.length > 0) {
             var deviceTable = document.createElement("table");
             deviceTable.className = "small device-table";
-
-            // Table Header
             var headerRow = document.createElement("tr");
             var th_ip = document.createElement("th");
             th_ip.innerHTML = "Device IP";
-
             var th_hostname = document.createElement("th");
             th_hostname.innerHTML = "Hostname";
-
             headerRow.appendChild(th_ip);
             headerRow.appendChild(th_hostname);
             deviceTable.appendChild(headerRow);
-
-            // Table Body
             info.deviceList.forEach(function(device) {
                 var tr = document.createElement("tr");
                 var ipCell = document.createElement("td");
                 ipCell.innerHTML = device.ip;
-
                 var hostnameCell = document.createElement("td");
                 hostnameCell.innerHTML = device.hostname;
-                
-                // Add classes for special hostnames
                 if (device.hostname === 'Gateway') {
                     hostnameCell.className = 'gateway';
                 } else if (device.hostname === 'Unknown') {
                     hostnameCell.className = 'unknown';
                 }
-
                 tr.appendChild(ipCell);
                 tr.appendChild(hostnameCell);
                 deviceTable.appendChild(tr);
@@ -126,7 +123,8 @@ Module.register("MMM-Network-Info", {
             tablesContainer.appendChild(deviceTable);
         }
 
-        return tablesContainer;
+        wrapper.appendChild(tablesContainer);
+        return wrapper;
     },
 
     // Override notification handler.
@@ -134,6 +132,7 @@ Module.register("MMM-Network-Info", {
         if (notification === "NETWORK_INFO_RESULT") {
             this.networkInfo = payload;
             this.loaded = true;
+            this.lastUpdated = new Date(); // Set the timestamp when data is received
             this.updateDom(this.config.animationSpeed * 1000);
         }
     },
@@ -144,7 +143,6 @@ Module.register("MMM-Network-Info", {
         if (typeof delay !== "undefined" && delay >= 0) {
             nextLoad = delay;
         }
-
         var self = this;
         clearTimeout(this.updateTimer);
         this.updateTimer = setTimeout(function() {

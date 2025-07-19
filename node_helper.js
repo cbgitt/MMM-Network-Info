@@ -98,16 +98,22 @@ module.exports = NodeHelper.create({
                 }
             });
             
-            const devicePromises = initialDevices.map(device => 
-                this.executeCommand(`dig +short -x ${device.ip}`, 'dig-reverse').then(result => {
-                    let hostname = 'N/A';
+            const devicePromises = initialDevices.map(device => {
+                // Check for gateway IP first
+                if (device.ip.endsWith('.1')) {
+                    return Promise.resolve({ ip: device.ip, hostname: 'Gateway' });
+                }
+                
+                // If not a gateway, perform the reverse lookup
+                return this.executeCommand(`dig +short -x ${device.ip}`, 'dig-reverse').then(result => {
+                    let hostname = 'Unknown'; // Default to 'Unknown'
                     // Check if the result is valid and not empty
                     if (result.value && result.value !== 'Not available') {
                         hostname = result.value.slice(0, -1); // Remove the trailing dot from dig's output
                     }
                     return { ip: device.ip, hostname: hostname };
-                })
-            );
+                });
+            });
 
             const devicesWithHostnames = await Promise.all(devicePromises);
             networkInfo.deviceList = devicesWithHostnames;

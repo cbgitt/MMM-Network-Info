@@ -1,5 +1,26 @@
 /* MMM-Network-Info.css */
 
+/* --- Custom Header Styling --- */
+.MMM-Network-Info .module-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid #999; /* A line to separate header from content */
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+.MMM-Network-Info .module-header .title {
+    /* The title will use the default module header font size and weight */
+}
+
+.MMM-Network-Info .module-header .timestamp {
+    font-size: 70%;
+    /* The 'dimmed' class from MM core will handle the color */
+}
+
+
+/* --- Main Content Wrapper --- */
 .MMM-Network-Info-wrapper {
   display: flex;
   gap: 30px; /* Adjust the space between the two tables */
@@ -18,12 +39,6 @@
 .MMM-Network-Info table {
   width: 100%;
   border-collapse: collapse;
-}
-
-/* --- Styling for timestamp --- */
-.MMM-Network-Info .last-updated {
-    margin-bottom: 10px; /* Space between timestamp and the tables */
-    font-size: 70%;      /* Make text 30% smaller */
 }
 
 /* --- Device Table Specific Styling --- */

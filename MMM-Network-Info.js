@@ -30,9 +30,10 @@ Module.register("MMM-Network-Info", {
     start: function() {
         Log.info("Starting module: " + this.name);
         this.loaded = false;
-        this.data.header = this.config.title;
+        // We set the header to empty to use our own custom header in getDom()
+        this.data.header = ""; 
         this.networkInfo = {};
-        this.lastUpdated = null; // Initialize timestamp variable
+        this.lastUpdated = null;
         this.scheduleUpdate(this.config.initialLoadDelay);
         this.updateTimer = null;
     },
@@ -47,14 +48,23 @@ Module.register("MMM-Network-Info", {
             return wrapper;
         }
 
-        // --- Last Updated Timestamp ---
+        // --- Custom Header ---
+        var headerDiv = document.createElement("div");
+        headerDiv.className = "module-header";
+        
+        var titleSpan = document.createElement("span");
+        titleSpan.className = "title";
+        titleSpan.innerHTML = this.config.title;
+        headerDiv.appendChild(titleSpan);
+
         if (this.lastUpdated) {
-            var updatedDiv = document.createElement("div");
-            // Use standard MM classes for styling + a custom one
-            updatedDiv.className = "last-updated dimmed xsmall"; 
-            updatedDiv.innerHTML = "Last updated: " + this.lastUpdated.toLocaleString();
-            wrapper.appendChild(updatedDiv);
+            var updatedSpan = document.createElement("span");
+            updatedSpan.className = "timestamp dimmed";
+            updatedSpan.innerHTML = "Updated: " + this.lastUpdated.toLocaleString();
+            headerDiv.appendChild(updatedSpan);
         }
+        wrapper.appendChild(headerDiv);
+
 
         // Main container for tables
         var tablesContainer = document.createElement("div");
@@ -127,17 +137,15 @@ Module.register("MMM-Network-Info", {
         return wrapper;
     },
 
-    // Override notification handler.
     socketNotificationReceived: function(notification, payload) {
         if (notification === "NETWORK_INFO_RESULT") {
             this.networkInfo = payload;
             this.loaded = true;
-            this.lastUpdated = new Date(); // Set the timestamp when data is received
+            this.lastUpdated = new Date();
             this.updateDom(this.config.animationSpeed * 1000);
         }
     },
 
-    // Schedule the next update.
     scheduleUpdate: function(delay) {
         var nextLoad = this.config.updateInterval;
         if (typeof delay !== "undefined" && delay >= 0) {
@@ -150,12 +158,10 @@ Module.register("MMM-Network-Info", {
         }, nextLoad * 1000);
     },
 
-    // Request network info from node_helper.
     getNetworkInfo: function() {
         this.sendSocketNotification("GET_NETWORK_INFO", this.config);
     },
 
-    // Add a custom CSS file.
     getStyles: function() {
         return ["MMM-Network-Info.css"];
     }

@@ -99,17 +99,14 @@ module.exports = NodeHelper.create({
             });
             
             const devicePromises = initialDevices.map(device => {
-                // Check for gateway IP first
                 if (device.ip.endsWith('.1')) {
                     return Promise.resolve({ ip: device.ip, hostname: 'Gateway' });
                 }
                 
-                // If not a gateway, perform the reverse lookup
                 return this.executeCommand(`dig +short -x ${device.ip}`, 'dig-reverse').then(result => {
-                    let hostname = 'Unknown'; // Default to 'Unknown'
-                    // Check if the result is valid and not empty
+                    let hostname = 'Unknown';
                     if (result.value && result.value !== 'Not available') {
-                        hostname = result.value.slice(0, -1); // Remove the trailing dot from dig's output
+                        hostname = result.value.slice(0, -1);
                     }
                     return { ip: device.ip, hostname: hostname };
                 });
@@ -143,7 +140,8 @@ module.exports = NodeHelper.create({
             try {
                 const geoData = JSON.parse(result.value);
                 if (geoData.status === "success") {
-                    callback(`${geoData.city}, ${geoData.regionName}, ${geoData.country}`);
+                    // MODIFIED LINE: Removed country from the output
+                    callback(`${geoData.city}, ${geoData.regionName}`);
                 } else {
                     callback("N/A");
                 }

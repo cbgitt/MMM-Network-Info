@@ -99,15 +99,22 @@ module.exports = NodeHelper.create({
             });
             
             const devicePromises = initialDevices.map(device => {
-                if (device.ip.endsWith('.1')) {
+                // Check for specific custom IPs first
+                if (device.ip === '192.168.86.1') {
+                    return Promise.resolve({ ip: device.ip, hostname: 'Gateway/Mesh' });
+                } else if (device.ip === '192.168.86.42') {
+                    return Promise.resolve({ ip: device.ip, hostname: 'Mesh (MBR Node)' });
+                } else if (device.ip === '192.168.86.43') {
+                    return Promise.resolve({ ip: device.ip, hostname: 'Mesh (BSMNT Node)' });
+                } else if (device.ip.endsWith('.1')) { // General gateway fallback
                     return Promise.resolve({ ip: device.ip, hostname: 'Gateway' });
                 }
                 
+                // If not a special IP, perform the reverse lookup
                 return this.executeCommand(`dig +short -x ${device.ip}`, 'dig-reverse').then(result => {
                     let hostname = 'Unknown';
                     if (result.value && result.value !== 'Not available') {
                         hostname = result.value.slice(0, -1); // Remove trailing dot
-                        // MODIFIED: Remove .lan suffix if it exists
                         if (hostname.endsWith('.lan')) {
                             hostname = hostname.slice(0, -4);
                         }
@@ -118,13 +125,8 @@ module.exports = NodeHelper.create({
 
             const devicesWithHostnames = await Promise.all(devicePromises);
             
-            // --- ADDED SORTING LOGIC ---
             devicesWithHostnames.sort((a, b) => {
-                // Rule 1: Gateway always comes first.
-                if (a.hostname === 'Gateway') return -1;
-                if (b.hostname === 'Gateway') return 1;
-
-                // Rule 2: Sort by IP address numerically.
+                // Sort by IP address numerically.
                 const a_parts = a.ip.split('.').map(Number);
                 const b_parts = b.ip.split('.').map(Number);
 
@@ -134,7 +136,7 @@ module.exports = NodeHelper.create({
                         return diff;
                     }
                 }
-                return 0; // Should not happen with unique IPs
+                return 0;
             });
             
             networkInfo.deviceList = devicesWithHostnames;
@@ -164,7 +166,6 @@ module.exports = NodeHelper.create({
             try {
                 const geoData = JSON.parse(result.value);
                 if (geoData.status === "success") {
-                    // MODIFIED LINE: Removed country from the output
                     callback(`${geoData.city}, ${geoData.regionName}`);
                 } else {
                     callback("N/A");

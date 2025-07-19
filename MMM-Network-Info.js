@@ -121,11 +121,19 @@ Module.register("MMM-Network-Info", {
                 ipCell.innerHTML = device.ip;
                 var hostnameCell = document.createElement("td");
                 hostnameCell.innerHTML = device.hostname;
-                if (device.hostname === 'Gateway') {
+                
+                // --- MODIFIED: Apply 'gateway' class to all green devices ---
+                if (
+                    device.hostname === 'Gateway' ||
+                    device.hostname === 'Gateway/Mesh' ||
+                    device.hostname === 'Mesh (MBR Node)' ||
+                    device.hostname === 'Mesh (BSMNT Node)'
+                ) {
                     hostnameCell.className = 'gateway';
                 } else if (device.hostname === 'Unknown') {
                     hostnameCell.className = 'unknown';
                 }
+
                 tr.appendChild(ipCell);
                 tr.appendChild(hostnameCell);
                 deviceTable.appendChild(tr);

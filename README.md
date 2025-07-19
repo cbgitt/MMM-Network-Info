@@ -1,4 +1,4 @@
-# Configuration Parameters
+# Configuration Parameters Defaults
 ```
 config: {
         updateInterval: 10 * 60, // in seconds, default 10 minutes

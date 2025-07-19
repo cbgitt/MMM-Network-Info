@@ -45,7 +45,6 @@ module.exports = NodeHelper.create({
         if (show.publicIp || show.geolocation) commands.publicIp = "dig +short myip.opendns.com @resolver1.opendns.com";
         if (show.tailscaleIp) commands.tailscaleIp = "tailscale ip -4";
 
-        // We always use 'arp -a' for the device list now, which is more robust.
         if (show.listDevices || show.networkDeviceCount) {
             commands.deviceList = "arp -a";
         }
@@ -84,23 +83,24 @@ module.exports = NodeHelper.create({
             }
         });
 
-        // If deviceList was fetched, parse it for all device info.
         if (networkInfo.deviceList) {
             const lines = networkInfo.deviceList.split('\n');
             const devices = [];
-            const ipRegex = /\(([^)]+)\)/; // Extracts content from parentheses
-            const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/; // Used for line validation
+            const ipRegex = /\(([^)]+)\)/;
+            const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
 
             lines.forEach(line => {
                 const ipMatch = line.match(ipRegex);
-                const macMatch = line.match(macRegex); // Ensures it's a valid device line
+                const macMatch = line.match(macRegex);
 
                 if (ipMatch && macMatch) {
-                    const hostname = line.split(' ')[0];
+                    // More robust way to get the hostname
+                    const hostnamePart = line.substring(0, line.indexOf(ipMatch[0])).trim();
+                    const hostname = (hostnamePart && hostnamePart !== '?') ? hostnamePart : 'N/A';
+                    
                     devices.push({
                         ip: ipMatch[1],
-                        hostname: (hostname !== '?') ? hostname : 'N/A'
-                        // MAC address is no longer added
+                        hostname: hostname
                     });
                 }
             });

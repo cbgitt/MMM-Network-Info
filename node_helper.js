@@ -85,7 +85,7 @@ module.exports = NodeHelper.create({
 
         if (networkInfo.deviceList) {
             const lines = networkInfo.deviceList.split('\n');
-            const devices = [];
+            const initialDevices = [];
             const ipRegex = /\(([^)]+)\)/;
             const macRegex = /([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}/;
 
@@ -94,21 +94,26 @@ module.exports = NodeHelper.create({
                 const macMatch = line.match(macRegex);
 
                 if (ipMatch && macMatch) {
-                    // More robust way to get the hostname
-                    const hostnamePart = line.substring(0, line.indexOf(ipMatch[0])).trim();
-                    const hostname = (hostnamePart && hostnamePart !== '?') ? hostnamePart : 'N/A';
-                    
-                    devices.push({
-                        ip: ipMatch[1],
-                        hostname: hostname
-                    });
+                    initialDevices.push({ ip: ipMatch[1] });
                 }
             });
             
-            networkInfo.deviceList = devices;
+            const devicePromises = initialDevices.map(device => 
+                this.executeCommand(`dig +short -x ${device.ip}`, 'dig-reverse').then(result => {
+                    let hostname = 'N/A';
+                    // Check if the result is valid and not empty
+                    if (result.value && result.value !== 'Not available') {
+                        hostname = result.value.slice(0, -1); // Remove the trailing dot from dig's output
+                    }
+                    return { ip: device.ip, hostname: hostname };
+                })
+            );
+
+            const devicesWithHostnames = await Promise.all(devicePromises);
+            networkInfo.deviceList = devicesWithHostnames;
 
             if (show.networkDeviceCount) {
-                networkInfo.networkDeviceCount = devices.length.toString();
+                networkInfo.networkDeviceCount = devicesWithHostnames.length.toString();
             }
         }
 

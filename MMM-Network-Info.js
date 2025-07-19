@@ -111,6 +111,13 @@ Module.register("MMM-Network-Info", {
 
                 var hostnameCell = document.createElement("td");
                 hostnameCell.innerHTML = device.hostname;
+                
+                // Add classes for special hostnames
+                if (device.hostname === 'Gateway') {
+                    hostnameCell.className = 'gateway';
+                } else if (device.hostname === 'Unknown') {
+                    hostnameCell.className = 'unknown';
+                }
 
                 tr.appendChild(ipCell);
                 tr.appendChild(hostnameCell);

@@ -22,28 +22,38 @@
 
 /* --- Device Table Specific Styling --- */
 
-/* Style all cells in the device table */
 .MMM-Network-Info .device-table th, 
 .MMM-Network-Info .device-table td {
   text-align: left;
-  padding-right: 15px; /* Add space between columns */
+  padding-right: 15px;
 }
 
-/* Style the header row */
 .MMM-Network-Info .device-table th {
   padding-bottom: 5px;
   border-bottom: 1px solid #666;
   font-weight: bold;
 }
 
-/* Style the data rows */
 .MMM-Network-Info .device-table td {
   padding-top: 2px;
 }
 
-/* Align the last column (now Hostname) to the right */
 .MMM-Network-Info .device-table th:last-child,
 .MMM-Network-Info .device-table td:last-child {
   text-align: right;
   padding-right: 0;
+}
+
+/* --- Styling for special hostnames --- */
+.MMM-Network-Info .gateway,
+.MMM-Network-Info .unknown {
+    font-weight: bold;
+}
+
+.MMM-Network-Info .gateway {
+    color: #2ECC71; /* Green */
+}
+
+.MMM-Network-Info .unknown {
+    color: #E74C3C; /* Red */
 }

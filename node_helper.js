@@ -106,7 +106,11 @@ module.exports = NodeHelper.create({
                 return this.executeCommand(`dig +short -x ${device.ip}`, 'dig-reverse').then(result => {
                     let hostname = 'Unknown';
                     if (result.value && result.value !== 'Not available') {
-                        hostname = result.value.slice(0, -1);
+                        hostname = result.value.slice(0, -1); // Remove trailing dot
+                        // MODIFIED: Remove .lan suffix if it exists
+                        if (hostname.endsWith('.lan')) {
+                            hostname = hostname.slice(0, -4);
+                        }
                     }
                     return { ip: device.ip, hostname: hostname };
                 });

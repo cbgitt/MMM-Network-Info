@@ -122,12 +122,12 @@ Module.register("MMM-Network-Info", {
                 var hostnameCell = document.createElement("td");
                 hostnameCell.innerHTML = device.hostname;
                 
-                // --- MODIFIED: Apply 'gateway' class to all green devices ---
+                // --- Apply 'gateway' class to all green devices ---
                 if (
                     device.hostname === 'Gateway' ||
                     device.hostname === 'Gateway/Mesh' ||
-                    device.hostname === 'Mesh (MBR Node)' ||
-                    device.hostname === 'Mesh (BSMNT Node)'
+                    device.hostname === 'Mesh-MBR' ||
+                    device.hostname === 'Mesh-BSMT'
                 ) {
                     hostnameCell.className = 'gateway';
                 } else if (device.hostname === 'Unknown') {

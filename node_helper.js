@@ -103,9 +103,9 @@ module.exports = NodeHelper.create({
                 if (device.ip === '192.168.86.1') {
                     return Promise.resolve({ ip: device.ip, hostname: 'Gateway/Mesh' });
                 } else if (device.ip === '192.168.86.42') {
-                    return Promise.resolve({ ip: device.ip, hostname: 'Mesh (MBR Node)' });
+                    return Promise.resolve({ ip: device.ip, hostname: 'Mesh-MBR' });
                 } else if (device.ip === '192.168.86.43') {
-                    return Promise.resolve({ ip: device.ip, hostname: 'Mesh (BSMNT Node)' });
+                    return Promise.resolve({ ip: device.ip, hostname: 'Mesh-BSMT' });
                 } else if (device.ip.endsWith('.1')) { // General gateway fallback
                     return Promise.resolve({ ip: device.ip, hostname: 'Gateway' });
                 }
